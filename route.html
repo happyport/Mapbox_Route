@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no'/>
+    <title>轨迹回放</title>
+    <link rel="stylesheet" href="libs/mapbox-gl.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+    </style>
+    <script type="text/javascript"  src="libs/axios.js"></script>
+    <script type="text/javascript"  src="libs/turf.js"></script>
+    <script type="text/javascript"  src="libs/mapbox-gl.js"></script>
+    <script type="text/javascript"  src="PathAnimation.js"></script>
+</head>
+<body>
+
+<div id='map'></div>
+
+<script type="text/javascript">
+    mapboxgl.accessToken =
+        "pk.eyJ1IjoiaGFwcHlwb3J0IiwiYSI6ImNpcmxtcXZ0OTAwNWJmbG5iZGZzcWtqZWsifQ.QnpWedGghZatVbS6wEeFtw";
+    var map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/streets-v11',
+        center: [121.463, 31.20691],
+        zoom: 14,
+        maxZoom: 15,
+        pitch: 60
+    });
+
+    map.on('load', () => {
+        axios.get("playdata.json")
+            .then(res=>{
+                const data=res.data;
+                init(data);
+                setTimeout(()=>{
+                    let animate=new PathAnimation({
+                        path: data,
+                        speed: 0.1* 5,
+                        rotate:true,
+                        repeat:-1,
+                        callback:dispatch
+                    });
+                    animate.start();
+                },2000)
+
+            })
+            .catch(err=>{
+                console.log(err)
+            })
+    });
+
+    function dispatch(evt) {
+        map.getSource("animate_point").setData({
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                "properties": {
+                    bearing:evt.angle
+                },
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": evt.coordinates
+                }
+            }]
+        })
+
+    }
+    function init(data){
+        let id="animate_play";
+        map.addSource(id,{
+            "type": "geojson",
+            "data": {
+                "type": "Feature",
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": data
+                }
+            }
+        });
+        map.addLayer({
+            id:id,
+            source:id,
+            type:"line",
+            paint:{
+                "line-color": "#888",
+                "line-width": 6
+            }
+        })
+
+        map.addSource("animate_point",{
+            "type": "geojson",
+            "data": {
+                "type": "Feature",
+                "properties": {
+                    bearing:0
+                },
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": data[0]
+                }
+            }
+        });
+        map.addLayer({
+            id:"animate_point",
+            source:"animate_point",
+            type:"symbol",
+            layout:{
+                "icon-image": "airport-15",
+                "icon-rotate": ["get", "bearing"],
+                // "icon-anchor":  "bottom",
+                //"icon-rotation-alignment": "map",
+                "icon-allow-overlap": true,
+                "icon-ignore-placement": false
+            },
+        })
+
+        map.addLayer({
+            id:"animate_point_point",
+            source:"animate_play",
+            type:"circle",
+            paint:{
+               "circle-radius":8,
+                "circle-color":"red"
+            },
+        })
+    }
+
+</script>
+</body>
+
+</html>
